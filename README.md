@@ -1,5 +1,5 @@
-# layer-magento-plugin_232
-This payment module is compatible upto Magento v2.3.5
+# layer-magento-plugin_1.1.0
+This payment module is compatible upto Magento v2.4
 
 Upload Open directory to app/code
 Use Composer to install 

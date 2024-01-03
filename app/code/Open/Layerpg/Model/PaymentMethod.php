@@ -1,6 +1,5 @@
 <?php
 /** 
- *
  * @copyright  Open
  * @license    http://opensource.org/licenses/osl-3.0.php  Open Software License (OSL 3.0)
  */
@@ -121,7 +120,7 @@ class PaymentMethod extends \Magento\Payment\Model\Method\AbstractMethod
     /**
      * Instantiate state and set it to state object.
      *
-     * @param string                        $paymentAction
+     * @param string $paymentAction
      * @param \Magento\Framework\DataObject $stateObject
      */
     public function initialize($paymentAction, $stateObject)

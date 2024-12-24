@@ -6,12 +6,16 @@
 
 namespace Open\Layerpg\Model;
 
+use Magento\Sales\Model\Order;
 use Magento\Sales\Model\Order\Payment;
 use Magento\Sales\Model\Order\Payment\Transaction;
 
 class PaymentMethod extends \Magento\Payment\Model\Method\AbstractMethod
 {
-    protected $_code = 'layerpg';
+    
+	const PAYMENT_CODE = 'layerpg';
+	
+	protected $_code = self::PAYMENT_CODE;
     protected $_isInitializeNeeded = true;
 
     /**
@@ -50,6 +54,8 @@ class PaymentMethod extends \Magento\Payment\Model\Method\AbstractMethod
 	protected $_accesskey;
 	protected $_secretkey;
 	protected $_sandbox;
+	
+	protected $_logger;
 
 	const BASE_URL_SANDBOX = "https://sandbox-icp-api.bankopen.co/api";
     const BASE_URL_UAT = "https://icp-api.bankopen.co/api";
@@ -97,7 +103,7 @@ class PaymentMethod extends \Magento\Payment\Model\Method\AbstractMethod
       $this->_orderFactory = $orderFactory;
       $this->_storeManager = $storeManager;
 	  $this->_countryHelper = \Magento\Framework\App\ObjectManager::getInstance()->get('\Magento\Directory\Model\Country');      
-	  
+	  $this->_logger = $logger;
 	  
 	  parent::__construct(
           $context,
@@ -276,6 +282,63 @@ class PaymentMethod extends \Magento\Payment\Model\Method\AbstractMethod
 				'data'=> ''
             ];
     }
+
+	public function postProcessing($order, $payment, $params)
+	{
+		$error='';
+		
+		try
+		{
+			$data = array(
+				'layer_pay_token_id'    => $params['layer_pay_token_id'],
+				'layer_order_amount'    => $params['layer_order_amount'],
+				'woo_order_id'     		=> $params['woo_order_id'],
+			);	
+			if ($this->verify_hash($data,$params['hash']) && !empty($data['woo_order_id'])) {
+				$payment_data = $this->get_payment_details($params['layer_payment_id']);
+				if(isset($payment_data['error'])){
+					$error = "Layer: an error occurred E14".$payment_data['error'];					
+				}
+				if(empty($error) && isset($payment_data['id']) && !empty($payment_data)){
+					if($payment_data['payment_token']['id'] != $params['layer_pay_token_id']){
+						$error = "Layer: received layer_pay_token_id and collected layer_pay_token_id doesnt match";						
+					}
+					elseif($data['layer_order_amount'] != $payment_data['amount']){
+						$error = "Layer: received amount and collected amount doesnt match";						
+					}
+					else {
+						
+						if($payment_data['status'] == 'authorized' || $payment_data['status'] == 'captured' ){
+								
+								$payment->setTransactionId($payment_data['id'])       
+										->setPreparedMessage('SUCCESS')
+										->setShouldCloseParentTransaction(true)
+										->setIsTransactionClosed(0)							
+										->registerCaptureNotification(number_format((float) $params['layer_order_amount'], 2, '.', ''),true);			
+			
+								//$this->logger->error($res);			
+			
+								$order->setTotalPaid($order->getGrandTotal()); 		
+								$order->setState(Order::STATE_PROCESSING)->setStatus(Order::STATE_PROCESSING);
+								$order->save();								
+						}
+						if($payment_data['status'] == 'cancelled' || $payment_data['status'] == 'failed' ){
+								$error = "Layer Payment cancelled/failed: Payment ID ". $payment_data['id'];                        																
+						}	
+					}
+				} 
+			}
+			else {
+				$error = 'Hash verification failed.';
+			}			
+		}
+		catch (\Exception $e) {
+			$error = $e->getMessage();            
+        }
+		
+		if(!empty($error))	$this->_logger->error($error);
+		return $error;
+	}
 
     public function getOrderPlaceRedirectUrl($storeId = null)
     {

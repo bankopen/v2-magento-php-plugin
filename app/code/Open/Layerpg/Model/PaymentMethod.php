@@ -164,7 +164,7 @@ class PaymentMethod extends \Magento\Payment\Model\Method\AbstractMethod
     	$amount = $order->getGrandTotal();
         $amount = number_format((float)$amount, 2, '.', '');
         	
-		$remote_script = "<script type='application/javascript' id='open_money_layer' src='https://payments.open.money/layer/js'></script>";
+		$remote_script = "<script type='application/javascript' id='open_money_layer' src='https://payments.open.money/layer.js'></script>";
 			
 		if($this->_sandbox){			
 			$remote_script = "<script type='application/javascript' id='open_money_layer' src='https://sandbox-payments.open.money/layer/js'></script>";
@@ -182,7 +182,8 @@ class PaymentMethod extends \Magento\Payment\Model\Method\AbstractMethod
                 'currency' => $currency,
                 'name'  => $firstname.' '.$lastname,
                 'email_id' => $email,
-                'contact_number' => $phone                
+                'contact_number' => $phone,
+				'mtx' => $txnid
             ]);
 		
 		$surl = self::getReturnUrl();			
@@ -294,7 +295,7 @@ class PaymentMethod extends \Magento\Payment\Model\Method\AbstractMethod
 				'layer_order_amount'    => $params['layer_order_amount'],
 				'woo_order_id'     		=> $params['woo_order_id'],
 			);	
-			if ($this->verify_hash($data,$params['hash']) && !empty($data['woo_order_id'])) {
+			if ($this->verify_hash($data,$params['hash']) && !empty($data['woo_order_id']) && !empty($params['layer_payment_id'])) {
 				$payment_data = $this->get_payment_details($params['layer_payment_id']);
 				if(isset($payment_data['error'])){
 					$error = "Layer: an error occurred E14".$payment_data['error'];					
@@ -329,7 +330,7 @@ class PaymentMethod extends \Magento\Payment\Model\Method\AbstractMethod
 				} 
 			}
 			else {
-				$error = 'Hash verification failed.';
+				$error = 'Payment Hash verification failed.';
 			}			
 		}
 		catch (\Exception $e) {
